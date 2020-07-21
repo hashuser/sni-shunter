@@ -45,7 +45,6 @@ automatic_reboot(){
 install_SNI(){
   mkdir $(cd "$(dirname "$0")";pwd)/SNI-shunter
   cd $(cd "$(dirname "$0")";pwd)/SNI-shunter
-  mkdir ./Cache
   apt-get update
   dpkg-reconfigure libc6
   DEBIAN_FRONTEND=noninteractive dpkg --configure libssl1.1 
