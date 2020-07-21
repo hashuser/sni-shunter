@@ -79,8 +79,8 @@ class shunter(core):
 
     def load_config(self):
         self.config_path = os.path.abspath(os.path.dirname(sys.argv[0]))
-        if os.path.exists(self.config_path + 'config.json'):
-            with open(self.config_path + 'config.json', 'r') as file:
+        if os.path.exists(self.config_path + '/config.json'):
+            with open(self.config_path + '/config.json', 'r') as file:
                 content = file.read()
             content = self.translate(content)
             self.config = json.loads(content)
@@ -89,6 +89,7 @@ class shunter(core):
                     self.SNIs[self.config['servers'][x]['sni'].encode('utf-8')] = (self.config['servers'][x]['ip'], self.config['servers'][x]['port'])
                 else:
                     self.SNIs[b''] = (self.config['servers'][x]['ip'], self.config['servers'][x]['port'])
+            print(self.config)
             self.config['listen'] = int(self.config['listen'])
         else:
             example = {'listen': '','servers': {'Yashmak': {'sni': '', 'ip': '', 'port': ''}}}
