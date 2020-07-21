@@ -1,7 +1,7 @@
 # sni-shunter
 ### 安装(Ubuntu 18.04TLS+)
 ```
-sudo curl -L https://raw.githubusercontent.com/sni-shunter/yashmak/master/install.sh | bash
+sudo curl -L https://raw.githubusercontent.com/hashuser/sni-shunter/master/install.sh | bash
 ``` 
 ### 配置
 ```
