@@ -87,9 +87,9 @@ class shunter(core):
             for x in self.config['servers']:
                 if self.config['servers'][x]['sni'].lower() != 'none':
                     self.SNIs[self.config['servers'][x]['sni'].encode('utf-8')] = (self.config['servers'][x]['ip'], self.config['servers'][x]['port'])
-                else:
+            for x in self.config['servers']:
+                if self.config['servers'][x]['sni'].lower() == 'none':
                     self.SNIs[b''] = (self.config['servers'][x]['ip'], self.config['servers'][x]['port'])
-            print(self.config)
             self.config['listen'] = int(self.config['listen'])
         else:
             example = {'listen': '','servers': {'Yashmak': {'sni': '', 'ip': '', 'port': ''}}}
