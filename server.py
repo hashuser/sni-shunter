@@ -78,7 +78,7 @@ class shunter(core):
         core.__init__(self)
 
     def load_config(self):
-        self.config_path = os.path.abspath(os.path.dirname(sys.argv[0])) + '/Config/'
+        self.config_path = os.path.abspath(os.path.dirname(sys.argv[0]))
         if os.path.exists(self.config_path + 'config.json'):
             with open(self.config_path + 'config.json', 'r') as file:
                 content = file.read()
