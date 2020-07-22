@@ -22,9 +22,8 @@ class core():
     async def handler(self, client_reader, client_writer):
         try:
             client_hello = await client_reader.read(256)
-            data = client_hello[128:]
             for x in self.SNIs:
-                if x in data:
+                if x in client_hello:
                     server_reader, server_writer = await asyncio.open_connection(host=self.SNIs[x][0],
                                                                                  port=self.SNIs[x][1])
                     server_writer.write(client_hello)
