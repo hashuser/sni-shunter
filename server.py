@@ -4,7 +4,6 @@ import os
 import sys
 import json
 import traceback
-import time
 
 class core():
     def __init__(self):
