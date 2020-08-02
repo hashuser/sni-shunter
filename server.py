@@ -16,8 +16,6 @@ class core():
                     addr = addr.replace('[', '')
                     addr = addr.replace(']', '')
                     listeners.append(socket.create_server(address=(addr[:addr.rfind(':')], int(addr[addr.rfind(':') + 1:])),
-                                             family=socket.AF_INET6, dualstack_ipv6=False))
-                    listeners.append(socket.create_server(address=(addr[:addr.rfind(':')], int(addr[addr.rfind(':') + 1:])),
                                              family=socket.AF_INET6, dualstack_ipv6=True))
                 else:
                     listeners.append(socket.create_server(address=(addr[:addr.rfind(':')], int(addr[addr.rfind(':') + 1:])),
@@ -32,7 +30,6 @@ class core():
 
     async def handler(self, client_reader, client_writer):
         try:
-            print('New')
             client_hello = await client_reader.read(256)
             host = None
             port = None
