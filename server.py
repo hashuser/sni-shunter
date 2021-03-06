@@ -8,9 +8,18 @@ import multiprocessing
 import uvloop
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
-class function():
-    def __init__(self,rules):
-        self.rules = rules
+class worker():
+    def __init__(self, listener, rules):
+        port = listener.getsockname()[1]
+        self.rules = dict()
+        for x in rules.keys():
+            if port in rules[x][0]:
+                self.rules[x] = rules[x]
+        self.loop = asyncio.get_event_loop()
+        server = asyncio.start_server(client_connected_cb=self.handler, sock=listener, backlog=4096)
+        self.loop.set_exception_handler(self.exception_handler)
+        self.loop.create_task(server)
+        self.loop.run_forever()
 
     async def handler(self, client_reader, client_writer):
         try:
@@ -18,104 +27,95 @@ class function():
             client_hello = await asyncio.wait_for(client_reader.read(256),20)
             if client_hello == b'':
                 raise Exception
+            instruction = client_hello[:4]
+            if b'GET' in instruction or b'POST' in instruction:
+                is_tls = False
+            else:
+                is_tls = True
             host = None
             port = None
             for x in self.rules:
-                if client_writer.get_extra_info("sockname")[1] not in self.rules[x][0]:
-                    continue
-                if b'sni' in x[:5]:
-                    commands = x.split(b' and ')
-                    for command in commands:
-                        sni = command[command.find(b'=') + 1:]
-                        if ((b'!=' in command[:5] and sni not in client_hello) or (b'!=' not in command[:5] and sni in client_hello)):
-                            if command == commands[-1]:
-                                host = self.rules[x][1][0]
-                                port = self.rules[x][1][1]
-                        else:
-                            break
-                    if host != None and port != None:
+                key_word = x[:5].lower()
+                if is_tls and b'sni' in key_word:
+                    sni = x[4:].lower()
+                    if sni == b'none':
+                        host = self.rules[x][1][0]
+                        port = self.rules[x][1][1]
+                    if sni in client_hello:
+                        host = self.rules[x][1][0]
+                        port = self.rules[x][1][1]
                         break
-                elif b'url' in x[:5]:
-                    if x.find(b'/', x.find(b'=') + 8) == -1:
+                elif not is_tls and b'url' in key_word:
+                    url = x[4:]
+                    if url.lower() == b'none':
+                        host = self.rules[x][1][0]
+                        port = self.rules[x][1][1]
+                    domain = url.replace(b'http://',b'',1)
+                    position = domain.find(b'/')
+                    if position == -1:
                         path = b'/'
                     else:
-                        path = x[x.find(b'/', x.find(b'=') + 8):]
-                    domain = x[:x.find(b'/', x.find(b'=') + 8)].replace(b'url=http://', b'')
-                    if ((b'!=' in x[:5] and (path not in client_hello or domain not in client_hello)) or (b'!=' not in x[:5] and (path in client_hello and domain in client_hello))):
+                        path = domain[position:]
+                        domain = domain[:position]
+                    if domain in client_hello and (position == -1 or path in client_hello):
                         host = self.rules[x][1][0]
                         port = self.rules[x][1][1]
                         break
             if host == None or port == None:
                 raise Exception
-            server_reader, server_writer = await asyncio.open_connection(host=host, port=port)
+            server_reader, server_writer = await asyncio.wait_for(asyncio.open_connection(host=host, port=port),5)
             server_writer.write(client_hello)
             await server_writer.drain()
             await asyncio.gather(self.switch(client_reader, server_writer, client_writer),
                                  self.switch(server_reader, client_writer, server_writer))
-        except Exception as e:
-            traceback.clear_frames(e.__traceback__)
-            e.__traceback__ = None
+        except Exception as error:
+            traceback.clear_frames(error.__traceback__)
+            error.__traceback__ = None
             await self.clean_up(client_writer, server_writer)
 
     async def switch(self, reader, writer, other):
         try:
-            while True:
+            while 1:
                 data = await reader.read(32768)
                 if data == b'':
                     raise Exception
                 writer.write(data)
                 await writer.drain()
-        except Exception as e:
-            traceback.clear_frames(e.__traceback__)
-            e.__traceback__ = None
+        except Exception as error:
+            traceback.clear_frames(error.__traceback__)
+            error.__traceback__ = None
             await self.clean_up(writer, other)
 
     async def clean_up(self, writer1=None, writer2=None):
         try:
-            writer1.close()
-        except Exception as e:
-            traceback.clear_frames(e.__traceback__)
-            e.__traceback__ = None
+            if writer1 != None:
+                writer1.close()
+        except Exception as error:
+            traceback.clear_frames(error.__traceback__)
+            error.__traceback__ = None
         try:
-            writer2.close()
-        except Exception as e:
-            traceback.clear_frames(e.__traceback__)
-            e.__traceback__ = None
+            if writer2 != None:
+                writer2.close()
+        except Exception as error:
+            traceback.clear_frames(error.__traceback__)
+            error.__traceback__ = None
         try:
-            await writer1.wait_closed()
-            writer1 = None
-        except Exception as e:
-            traceback.clear_frames(e.__traceback__)
-            e.__traceback__ = None
+            if writer1 != None:
+                await writer1.wait_closed()
+                writer1 = None
+        except Exception as error:
+            traceback.clear_frames(error.__traceback__)
+            error.__traceback__ = None
         try:
-            await writer2.wait_closed()
-            writer2 = None
-        except Exception as e:
-            traceback.clear_frames(e.__traceback__)
-            e.__traceback__ = None
+            if writer2 != None:
+                await writer2.wait_closed()
+                writer2 = None
+        except Exception as error:
+            traceback.clear_frames(error.__traceback__)
+            error.__traceback__ = None
 
     def exception_handler(self, loop, context):
         pass
-
-class worker(function):
-    def __init__(self, listener, rules):
-        self.rules = rules
-        self.loop = asyncio.get_event_loop()
-        server = asyncio.start_server(client_connected_cb=self.handler, sock=listener, backlog=4096)
-        self.loop.set_exception_handler(self.exception_handler)
-        self.loop.create_task(server)
-        self.loop.run_forever()
-
-class simple(function):
-    def __init__(self, listeners, rules):
-        self.rules = rules
-        self.loop = asyncio.get_event_loop()
-        servers = []
-        for listener in listeners:
-            servers.append(asyncio.start_server(client_connected_cb=self.handler, sock=listener, backlog=4096))
-        self.loop.set_exception_handler(self.exception_handler)
-        asyncio.gather(*servers)
-        self.loop.run_forever()
 
 class core():
     def __init__(self):
@@ -132,13 +132,14 @@ class core():
                                              family=socket.AF_INET, reuse_port=True, dualstack_ipv6=False))
             except Exception:
                 print("Invalid address", addr)
-        if self.config['mode'].lower() == 'worker':
-            for listener in listeners:
-                for x in range(os.cpu_count()):
-                    P = multiprocessing.Process(target=worker, args=(listener, self.rules,))
-                    P.start()
-        elif self.config['mode'].lower() == 'simple':
-                simple(listeners,self.rules)
+        process_pool = []
+        for listener in listeners:
+            for x in range(os.cpu_count()):
+                P = multiprocessing.Process(target=worker, args=(listener, self.rules,))
+                P.start()
+                process_pool.append(P)
+        for x in process_pool:
+            x.join()
 
 class shunter(core):
     def __init__(self):
@@ -157,19 +158,18 @@ class shunter(core):
             self.config = json.loads(content)
             listen = set()
             for x in self.config:
-                if x != 'mode':
-                    s_port = []
-                    for y in self.config[x]['listen']:
-                        listen.add(y)
-                        s_port.append(int(y[y.rfind(':') + 1:]))
-                    d_addr = self.config[x]['dst'][:self.config[x]['dst'].rfind(':')]
-                    d_addr = d_addr.replace('[', '')
-                    d_addr = d_addr.replace(']', '')
-                    d_port = int(self.config[x]['dst'][self.config[x]['dst'].rfind(':') + 1:])
-                    self.rules[self.config[x]['rule'].encode('utf-8')] = (s_port, (d_addr, d_port))
+                s_port = []
+                for y in self.config[x]['listen']:
+                    listen.add(y)
+                    s_port.append(int(y[y.rfind(':') + 1:]))
+                d_addr = self.config[x]['dst'][:self.config[x]['dst'].rfind(':')]
+                d_addr = d_addr.replace('[', '')
+                d_addr = d_addr.replace(']', '')
+                d_port = int(self.config[x]['dst'][self.config[x]['dst'].rfind(':') + 1:])
+                self.rules[self.config[x]['rule'].encode('utf-8')] = (s_port, (d_addr, d_port))
             self.config['listen'] = list(listen)
         else:
-            example = {'mode':'', 'Yashmak': {'listen': [''], 'dst': '' ,'rule': ''}}
+            example = {'Yashmak': {'listen': [''], 'dst': '' ,'rule': ''}}
             try:
                 os.makedirs(self.config_path)
             except Exception:
