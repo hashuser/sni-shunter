@@ -6,6 +6,9 @@ import json
 import traceback
 import multiprocessing
 import uvloop
+import gc
+
+gc.set_threshold(100000, 50, 50)
 
 asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
 class worker():
